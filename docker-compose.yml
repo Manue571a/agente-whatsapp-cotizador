@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  agente-whatsapp:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - META_VERIFY_TOKEN=mi_clave_secreta_cotizador_123
+    restart: always
