@@ -6,15 +6,13 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 
-// Función de Scraping adaptada a Dukal.cl
+// Función para buscar en Dukal.cl
 async function buscarEnDukal(busqueda) {
   try {
     const url = 'https://dukal.cl';
     const { data: html } = await axios.get(url, {
-      timeout: 5000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+      timeout: 8000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
     });
 
     const $ = cheerio.load(html);
@@ -30,7 +28,7 @@ async function buscarEnDukal(busqueda) {
       const precioMatch = textoBloque.match(/\$\d{1,3}(\.\d{3})+/);
       const precio = precioMatch ? precioMatch[0] : 'Consultar';
 
-      if (titulo && (titulo.toLowerCase().includes(consulta) || consulta === 'hola' || consulta === 'cotizar' || consulta === 'autos' || consulta === '')) {
+      if (titulo && (titulo.toLowerCase().includes(consulta) || consulta === 'hola' || consulta === 'cotizar' || consulta === '')) {
         if (!resultados.some(item => item.link === link)) {
           resultados.push({ titulo, precio, link });
         }
@@ -38,49 +36,45 @@ async function buscarEnDukal(busqueda) {
     });
 
     if (resultados.length > 0) {
-      let mensaje = `🚗 *Vehículos encontrados en Dukal.cl:*\n\n`;
-      resultados.slice(0, 4).forEach((auto, index) => {
-        mensaje += `*${index + 1}. ${auto.titulo}*\n`;
-        mensaje += `• *Precio:* ${auto.precio}\n`;
-        mensaje += `• *Ver ficha:* ${auto.link}\n\n`;
+      let mensaje = `🚗 Vehículos encontrados en Dukal.cl:\n\n`;
+      resultados.slice(0, 3).forEach((auto, index) => {
+        mensaje += `${index + 1}. ${auto.titulo}\n`;
+        mensaje += `• Precio: ${auto.precio}\n`;
+        mensaje += `• Ver ficha: ${auto.link}\n\n`;
       });
-      mensaje += `¿Te gustaría solicitar un crédito o agendar una prueba de manejo?`;
+      mensaje += `¿Te gustaría agendar una prueba de manejo o solicitar financiamiento?`;
       return mensaje;
     } else {
-      return `¡Hola! Bienvenid@ a *Dukal.cl* 🚗\n\nNo encontré modelos con la palabra "${busqueda}". Puedes ver todo nuestro catálogo disponible aquí: https://dukal.cl/inventory/`;
+      return `¡Hola! No encontré coincidencias para "${busqueda}". Puedes ver todo el catálogo en https://dukal.cl/inventory/`;
     }
 
   } catch (error) {
-    console.error('Error haciendo scraping en Dukal.cl:', error.message);
-    return `¡Hola! Bienvenid@ a *Dukal.cl* 🚗\n\nPuedes revisar todos nuestros vehículos disponibles directamente en: https://dukal.cl`;
+    console.error('Error en scraping:', error.message);
+    return `¡Hola! Revisa todo el catálogo actualizado en nuestro sitio web: https://dukal.cl`;
   }
 }
 
-// Endpoint Health Check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', port: process.env.PORT || 3000 });
-});
+// Health Check
+app.get('/health', (req, res) => res.status(200).send('OK'));
 
-// Endpoint Verificación Webhook
+// Verificación Webhook Meta
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode && token) {
-    if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
-      console.log('WEBHOOK_VERIFICADO');
-      res.status(200).send(challenge);
-    } else {
-      res.sendStatus(403);
-    }
+  if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
+    res.status(200).send(challenge);
   } else {
-    res.sendStatus(400);
+    res.sendStatus(403);
   }
 });
 
-// Endpoint Eventos Webhook WhatsApp
+// Eventos Webhook
 app.post('/webhook', async (req, res) => {
+  // Responder inmediatamente a Meta para confirmar recepción
+  res.sendStatus(200);
+
   try {
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
@@ -92,33 +86,31 @@ app.post('/webhook', async (req, res) => {
       const textBody = message.text.body;
       const phoneNumberId = value.metadata?.phone_number_id;
 
-      console.log(`Petición recibida de ${from}: "${textBody}"`);
+      console.log(`[ENTRANTE] Mensaje de ${from}: "${textBody}"`);
 
-      // Obtener respuesta
       const respuestaTexto = await buscarEnDukal(textBody);
 
-      // Intentar enviar respuesta por la API de Meta
-      const metaResponse = await axios({
-        method: 'POST',
-        url: `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
-        headers: {
-          'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        data: {
+      const response = await axios.post(
+        `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+        {
           messaging_product: 'whatsapp',
+          recipient_type: 'individual',
           to: from,
-          text: { body: respuestaTexto }
+          type: 'text',
+          text: { preview_url: false, body: respuestaTexto }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
 
-      console.log(`Respuesta enviada con éxito a ${from}. Message ID:`, metaResponse.data?.messages?.[0]?.id);
+      console.log(`[ÉXITO] Mensaje enviado a ${from}. ID: ${response.data?.messages?.[0]?.id}`);
     }
-
-    res.sendStatus(200);
   } catch (error) {
-    console.error('ERROR ENVIANDO MENSAJE A META:', error.response?.data || error.message);
-    res.sendStatus(200); // Se responde 200 a Meta para evitar reintentos infinitos
+    console.error('[ERROR META API]:', error.response?.data || error.message);
   }
 });
 
