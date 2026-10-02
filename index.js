@@ -72,7 +72,7 @@ app.get('/webhook', (req, res) => {
 
 // Eventos Webhook
 app.post('/webhook', async (req, res) => {
-  // Responder inmediatamente a Meta para confirmar recepción
+  // Confirmación inmediata a Meta
   res.sendStatus(200);
 
   try {
@@ -84,14 +84,15 @@ app.post('/webhook', async (req, res) => {
     if (message && message.type === 'text') {
       const from = message.from;
       const textBody = message.text.body;
-      const phoneNumberId = value.metadata?.phone_number_id;
+      const phoneNumberId = value.metadata?.phone_number_id || '1351513428040133';
 
       console.log(`[ENTRANTE] Mensaje de ${from}: "${textBody}"`);
 
       const respuestaTexto = await buscarEnDukal(textBody);
 
+      // Envío de respuesta mediante API Graph v25.0
       const response = await axios.post(
-        `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+        `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`,
         {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
