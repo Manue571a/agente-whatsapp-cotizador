@@ -6,14 +6,13 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 
-// Función para hacer Web Scraping a Dukal.cl en tiempo real
+// Función de Scraping adaptada a la estructura WordPress de Dukal.cl
 async function buscarEnDukal(busqueda) {
   try {
     const url = 'https://dukal.cl';
-    // Obtener el HTML de la página principal / catálogo de Dukal
     const { data: html } = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
@@ -21,45 +20,58 @@ async function buscarEnDukal(busqueda) {
     const resultados = [];
     const consulta = busqueda.toLowerCase().trim();
 
-    // Recorrer los elementos de vehículos en la página
-    // (Ajusta los selectores de acuerdo con la estructura HTML de dukal.cl)
-    $('article, .vehicle-card, .car-item, div[class*="product"], div[class*="auto"]').each((_, el) => {
-      const titulo = $(el).find('h2, h3, .title, [class*="title"]').text().trim();
-      const precio = $(el).find('.price, [class*="price"]').text().trim();
-      const linkRelativo = $(el).find('a').attr('href');
-      const link = linkRelativo ? (linkRelativo.startsWith('http') ? linkRelativo : `${url}${linkRelativo}`) : url;
+    // Recorrer los enlaces de publicaciones (/listings/)
+    $('a[href*="/listings/"]').each((_, el) => {
+      const link = $(el).attr('href');
+      const contenedor = $(el).closest('div, article, li');
+      
+      // Extraer datos del bloque contenedor
+      let textoBloque = contenedor.text().replace(/\s+/g, ' ').trim();
+      let titulo = $(contenedor).find('h2, h3, h4, .title, a[href*="/listings/"]').first().text().trim();
+      
+      // Buscar el precio principal en el bloque
+      const precioMatch = textoBloque.match(/\$\d{1,3}(\.\d{3})+/);
+      const precio = precioMatch ? precioMatch[0] : 'Consultar';
 
-      if (titulo && titulo.toLowerCase().includes(consulta)) {
-        resultados.push({ titulo, precio, link });
+      // Si se encuentra título y coincide con la búsqueda
+      if (titulo && (titulo.toLowerCase().includes(consulta) || consulta === 'hola' || consulta === 'cotizar' || consulta === 'autos')) {
+        // Evitar duplicados por el enlace
+        if (!resultados.some(item => item.link === link)) {
+          resultados.push({
+            titulo: titulo,
+            precio: precio,
+            link: link
+          });
+        }
       }
     });
 
-    // Construir respuesta de WhatsApp
+    // Construir mensaje para enviar a WhatsApp
     if (resultados.length > 0) {
-      let mensaje = `🚗 *Vehículos encontrados en Dukal.cl para "${busqueda}":*\n\n`;
-      resultados.slice(0, 3).forEach((auto, index) => {
+      let mensaje = `🚗 *Vehículos encontrados en Dukal.cl:*\n\n`;
+      resultados.slice(0, 4).forEach((auto, index) => {
         mensaje += `*${index + 1}. ${auto.titulo}*\n`;
-        if (auto.precio) mensaje += `• *Precio:* ${auto.precio}\n`;
-        mensaje += `• *Ver en sitio:* ${auto.link}\n\n`;
+        mensaje += `• *Precio:* ${auto.precio}\n`;
+        mensaje += `• *Ver ficha:* ${auto.link}\n\n`;
       });
-      mensaje += `¿Deseas agendar una visita o consultar por financiamiento?`;
+      mensaje += `¿Te gustaría solicitar un crédito o agendar una prueba de manejo?`;
       return mensaje;
     } else {
-      return `No encontré coincidencias exactas para "${busqueda}" en Dukal.cl en este momento.\n\nPuedes revisar el catálogo completo directamente en https://dukal.cl`;
+      return `No encontré vehículos coincidentes con "${busqueda}" en la portada.\n\nPuedes revisar todo nuestro catálogo en https://dukal.cl/inventory/`;
     }
 
   } catch (error) {
-    console.error('Error haciendo scraping en Dukal.cl:', error.message);
-    return `¡Hola! Puedes revisar la lista actualizada de vehículos y sus precios directamente en nuestro sitio web: https://dukal.cl`;
+    console.error('Error realizando scraping:', error.message);
+    return `¡Hola! Revisa el catálogo actualizado en nuestro sitio web: https://dukal.cl`;
   }
 }
 
-// Endpoint de Health Check
+// Endpoint Health Check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', port: process.env.PORT || 3000 });
 });
 
-// Endpoint de verificación del Webhook
+// Endpoint Verificación Webhook
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -77,7 +89,7 @@ app.get('/webhook', (req, res) => {
   }
 });
 
-// Endpoint para recibir y responder cotizaciones vía Webhook
+// Endpoint Eventos Webhook WhatsApp
 app.post('/webhook', async (req, res) => {
   try {
     const entry = req.body.entry?.[0];
@@ -90,10 +102,12 @@ app.post('/webhook', async (req, res) => {
       const textBody = message.text.body;
       const phoneNumberId = value.metadata?.phone_number_id;
 
-      // Obtener respuesta leyendo la web de Dukal.cl
+      console.log(`Consulta recibida de ${from}: "${textBody}"`);
+
+      // Obtener vehículos de dukal.cl
       const respuestaTexto = await buscarEnDukal(textBody);
 
-      // Enviar respuesta por WhatsApp
+      // Responder vía Graph API
       await axios({
         method: 'POST',
         url: `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
@@ -108,15 +122,15 @@ app.post('/webhook', async (req, res) => {
         }
       });
 
-      console.log(`Cotización leída de Dukal.cl y enviada a ${from}`);
+      console.log(`Respuesta con datos reales enviada a ${from}`);
     }
 
     res.sendStatus(200);
   } catch (error) {
-    console.error('Error procesando webhook:', error.response?.data || error.message);
+    console.error('Error enviando mensaje:', error.response?.data || error.message);
     res.sendStatus(500);
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Servidor Dukal con Scraper activo en el puerto ' + PORT));
+app.listen(PORT, () => console.log('Servidor Dukal Scraper listo en puerto ' + PORT));
