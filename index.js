@@ -5,7 +5,8 @@ const app = express();
 app.use(express.json());
 
 // CONFIGURACIÓN DE TU CUENTA META
-const TOKEN_PERMANENTE = 'TU_TOKEN_PERMANENTE_AQUI'; // Pegar aquí tu token de Meta
+const TOKEN_PERMANENTE = 'EAARcdnxlZCXkBSoOnWBpdXzcFOYSYXlbtKpowmCUOsoHFLBDHA7OgoyANFyEISxBPu9WQTNSPGsdO64hZAbUfoehq1zMI359SZCHmOqHG193ndLZAKA1q2CbZAcFMkZBacksU5RItJIwZBglPPy85W70h43TsZBV0FOlo0fbnfZCiIZB77c9hSsYm220Rp2Efj9AZDZD
+'; // Pegar aquí tu token de Meta
 const PHONE_NUMBER_ID = '1332205446647554';          // ID de producción
 const VERIFY_TOKEN = 'dukal_token_secreto_123';      // Token para validar el Webhook
 
