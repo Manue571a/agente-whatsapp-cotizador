@@ -1,0 +1,15 @@
+﻿version: '3.8'
+
+services:
+  bot-dukal:
+    build: .
+    container_name: bot-dukal-autos
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - TOKEN_PERMANENTE=${EAARcdnxlZCXkBSoOnWBpdXzcFOYSYXlbtKpowmCUOsoHFLBDHA7OgoyANFyEISxBPu9WQTNSPGsdO64hZAbUfoehq1zMI359SZCHmOqHG193ndLZAKA1q2CbZAcFMkZBacksU5RItJIwZBglPPy85W70h43TsZBV0FOlo0fbnfZCiIZB77c9hSsYm220Rp2Efj9AZDZD
+}
+      - PHONE_NUMBER_ID=${PHONE_NUMBER_ID:-1332205446647554}
+      - VERIFY_TOKEN=${VERIFY_TOKEN:-dukal_token_secreto_123}
