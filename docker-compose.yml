@@ -2,7 +2,7 @@
 
 services:
   bot-dukal:
-    image: cotizador-bot-dukal
+    build: .
     container_name: bot-dukal-autos
     restart: always
     ports:
@@ -12,9 +12,6 @@ services:
       - TOKEN_PERMANENTE=EAARcdnxlZCXkBSrm6r4RjesgE3rayQLRF5re3aG4IcTftSGuts7vauOMnkybfmulXnlsIZCnQf0yH41ZAFcoXR6SEvSqDwiGazyHjOukflxkZCn0UNZBWZCWzbx3ZBtSVN9IptXNWvhWRS3kD31QSlp7kZCYnYIxli34vedTfb46LkrzPUaYrYnv095FXBzZBJAZDZD
       - PHONE_NUMBER_ID=1332205446647554
       - VERIFY_TOKEN=dukal_token_secreto_123
-    networks:
-      - red_bot
+    
 
-networks:
-  red_bot:
-    driver: bridge
+
