@@ -2,7 +2,7 @@
 
 services:
   bot-dukal:
-    image: cotizador-bot-dukal
+    image: build
     container_name: bot-dukal-autos
     restart: always
     network_mode: 
