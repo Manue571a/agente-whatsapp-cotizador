@@ -5,7 +5,6 @@ services:
     image: cotizador-bot-dukal
     container_name: bot-dukal-autos
     restart: always
-    network_mode: 
     ports:
       - "3000:3000"
     environment:
